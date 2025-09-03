@@ -2,132 +2,78 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Análise de Fotos</title>
-  <script src="https://unpkg.com/@zxing/library@latest"></script>
   <style>
-    body {
-      background-color: #121212;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-    #camera {
-      width: 320px;
-      height: 240px;
-      border: 2px solid #fff;
-      margin-bottom: 20px;
-    }
-    #pallet-info {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    #pallet-info .label {
-      font-size: 18px;
-      opacity: 0.7;
-    }
-    #pallet-info .number {
-      font-size: 48px;
-      font-weight: bold;
-    }
-    button {
-      padding: 10px 20px;
-      margin: 5px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    #next-btn { background-color: #28a745; color: #fff; }
-    #clear-btn { background-color: #dc3545; color: #fff; }
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; text-align: center; }
+    video { width: 100%; max-width: 400px; border: 3px solid #333; margin: 20px 0; }
+    .info { font-size: 18px; margin: 10px 0; }
+    .destaque { font-size: 24px; font-weight: bold; color: #007BFF; }
+    button { font-size: 18px; padding: 10px 20px; margin: 10px; cursor: pointer; }
   </style>
 </head>
 <body>
+  <h1>Análise de Fotos</h1>
+  <video id="video" autoplay></video>
+  <div class="info">NP: <span class="destaque" id="np">-</span></div>
+  <div class="info">Pallet: <span class="destaque" id="pallet">-</span></div>
+  <div class="info">Quantidade total: <span class="destaque" id="quantidade">0</span></div>
+  <button onclick="confirmar()">Confirmar e Próximo</button>
 
-<video id="camera" autoplay></video>
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbwSqSk06kJSYQEI-8B51skB7MhM2zYty0SKiK1rjlke7qR7BLkmGjsbScvb2MsaSo-5QA/exec";
+    const video = document.getElementById("video");
+    const npEl = document.getElementById("np");
+    const palletEl = document.getElementById("pallet");
+    const qtdEl = document.getElementById("quantidade");
 
-<div id="pallet-info">
-  <div class="label">PALLET</div>
-  <div class="number" id="pallet-number">0</div>
-  <div class="label">Quantidade: <span id="pallet-qty">0</span></div>
-</div>
+    let codigoAtual = "";
 
-<button id="next-btn">Confirmar e Próximo</button>
-<button id="clear-btn">Limpar Dados</button>
+    // Inicializa a câmera
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => video.srcObject = stream)
+      .catch(err => alert("Erro câmera: " + err));
 
-<script>
-  const API_URL = "https://script.google.com/macros/s/AKfycbxAYdufBAwOtDiblM8dvxbg-A6kJ81COV04SadLs5Pc897TFrpCFQf3ERylB6l2uv0s/exec"; // Substitua pelo link gerado no Apps Script
+    // Scanner ZXing
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+    codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+      if (result && result.text !== codigoAtual) {
+        codigoAtual = result.text;
+        consultarNP(codigoAtual);
+      }
+    });
 
-  let selectedPallet = 0;
-  let pallets = {}; // Armazena NP: {pallet, quantidade}
-
-  const codeReader = new ZXing.BrowserBarcodeReader();
-  const videoElement = document.getElementById('camera');
-
-  // Inicializa a câmera
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-  .then((stream) => {
-    videoElement.srcObject = stream;
-  })
-  .catch(err => console.error(err));
-
-  function parseNP(code) {
-    if (code.startsWith("0")) {
-      let main = code.split(".")[0];
-      return main.slice(0,8);
-    } else {
-      return code.slice(0,8);
+    function consultarNP(codigo) {
+      fetch(API_URL + "?codigo=" + encodeURIComponent(codigo))
+        .then(r => r.json())
+        .then(data => {
+          npEl.textContent = data.np;
+          palletEl.textContent = data.pallet;
+          qtdEl.textContent = data.quantidade;
+        })
+        .catch(err => console.error(err));
     }
-  }
 
-  function updateDisplay(np) {
-    if (!pallets[np]) {
-      selectedPallet++;
-      pallets[np] = { pallet: selectedPallet, quantidade: 0 };
+    function confirmar() {
+      if (!codigoAtual) {
+        alert("Nenhum código detectado!");
+        return;
+      }
+      fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: codigoAtual, quantidade: 1 })
+      })
+      .then(r => r.json())
+      .then(data => {
+        npEl.textContent = data.np;
+        palletEl.textContent = data.pallet;
+        qtdEl.textContent = data.quantidadeTotal;
+        codigoAtual = "";
+        alert("Registrado com sucesso!");
+      })
+      .catch(err => console.error(err));
     }
-    pallets[np].quantidade++;
-
-    document.getElementById('pallet-number').textContent = pallets[np].pallet;
-    document.getElementById('pallet-qty').textContent = pallets[np].quantidade;
-
-    enviarParaPlanilha(np, pallets[np].pallet, pallets[np].quantidade);
-  }
-
-  function enviarParaPlanilha(np, pallet, quantidade) {
-    fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({ np, pallet, quantidade }),
-      headers: { 'Content-Type': 'application/json' }
-    })
-    .then(r => r.json())
-    .then(data => console.log("Enviado:", data))
-    .catch(err => console.error("Erro:", err));
-  }
-
-  codeReader.decodeFromVideoDevice(null, 'camera', (result, err) => {
-    if (result) {
-      let np = parseNP(result.text);
-      updateDisplay(np);
-    }
-  });
-
-  document.getElementById('next-btn').addEventListener('click', () => {
-    videoElement.play();
-  });
-
-  document.getElementById('clear-btn').addEventListener('click', () => {
-    pallets = {};
-    selectedPallet = 0;
-    document.getElementById('pallet-number').textContent = '0';
-    document.getElementById('pallet-qty').textContent = '0';
-    alert("Dados locais limpos! Para limpar a planilha, faça manualmente.");
-  });
-</script>
-
+  </script>
 </body>
 </html>
