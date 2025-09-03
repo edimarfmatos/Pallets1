@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Endereçamento de Pallets</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; background: #f7f7f7; }
+    h1 { margin-top: 20px; color: #333; }
+    #scanner { margin-top: 20px; }
+    #result { margin-top: 40px; font-size: 24px; color: #222; }
+    .pallet-label { font-size: 18px; color: gray; }
+    .pallet-number { font-size: 48px; font-weight: bold; color: #000; }
+    button { margin-top: 20px; padding: 10px 20px; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Endereçamento de Pallets</h1>
+  <video id="scanner" width="300" height="200"></video>
+  <div id="result">
+    <div class="pallet-label">PALLET</div>
+    <div class="pallet-number" id="palletNum">--</div>
+  </div>
+  <button onclick="resetScanner()">Confirmar</button>
+
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <script>
+    const codeReader = new ZXing.BrowserBarcodeReader();
+    const videoElement = document.getElementById('scanner');
+    const palletNum = document.getElementById('palletNum');
+    const API_URL = "https://script.google.com/macros/s/AKfycbyS_MWlAyA3g9dMy4gjIA0tfgTYQ9GWqdj55FKwmFYQtTm_AraTMaF0VoAfVyFKAy8D/exec";
+
+    startScanner();
+
+    function startScanner() {
+      codeReader.decodeFromVideoDevice(null, videoElement, (result, err) => {
+        if (result) {
+          handleBarcode(result.getText());
+        }
+      });
+    }
+
+    async function handleBarcode(barcode) {
+      const res = await fetch(`${API_URL}?action=scan&barcode=${barcode}`);
+      const data = await res.json();
+      palletNum.textContent = data.pallet;
+    }
+
+    function resetScanner() {
+      palletNum.textContent = "--";
+    }
+  </script>
+</body>
+</html>
