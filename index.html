@@ -5,50 +5,81 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Endereçamento de Pallets</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #f7f7f7; }
-    h1 { margin-top: 20px; color: #333; }
-    #scanner { margin-top: 20px; }
-    #result { margin-top: 40px; font-size: 24px; color: #222; }
-    .pallet-label { font-size: 18px; color: gray; }
-    .pallet-number { font-size: 48px; font-weight: bold; color: #000; }
-    button { margin-top: 20px; padding: 10px 20px; font-size: 18px; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0; padding: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100vh;
+    }
+    h1 { font-size: 24px; margin-bottom: 20px; }
+    video { width: 80%; border: 2px solid #333; border-radius: 8px; }
+    #resultado {
+      margin-top: 20px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    #pallet { font-size: 48px; font-weight: bold; }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: #4CAF50; color: white;
+      border: none; border-radius: 5px;
+      font-size: 18px; cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <h1>Endereçamento de Pallets</h1>
-  <video id="scanner" width="300" height="200"></video>
-  <div id="result">
-    <div class="pallet-label">PALLET</div>
-    <div class="pallet-number" id="palletNum">--</div>
+  <h1>Escanear Código</h1>
+  <video id="video" autoplay></video>
+  <div id="resultado">
+    <p>PALLET</p>
+    <p id="pallet">--</p>
+    <p>Quantidade: <span id="quantidade">0</span></p>
   </div>
-  <button onclick="resetScanner()">Confirmar</button>
+  <button onclick="resetar()">Próximo</button>
 
   <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script>
-    const codeReader = new ZXing.BrowserBarcodeReader();
-    const videoElement = document.getElementById('scanner');
-    const palletNum = document.getElementById('palletNum');
-    const API_URL = "https://script.google.com/macros/s/AKfycbyS_MWlAyA3g9dMy4gjIA0tfgTYQ9GWqdj55FKwmFYQtTm_AraTMaF0VoAfVyFKAy8D/exec";
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+    const videoElement = document.getElementById('video');
+    const palletEl = document.getElementById('pallet');
+    const qtdEl = document.getElementById('quantidade');
 
-    startScanner();
+    function resetar() {
+      palletEl.textContent = "--";
+      qtdEl.textContent = "0";
+      iniciarScanner();
+    }
 
-    function startScanner() {
+    function enviarCodigo(np) {
+      const url = 'https://script.google.com/macros/s/AKfycbyG5dMQxRXxne2tHEVmGpPBG7ugF2s9UEC8JZWBXaVKDxiELjaq5kNXzAJajb6GGOBO/exec?np=' + np;
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          palletEl.textContent = data.pallet;
+          qtdEl.textContent = data.quantidade;
+          codeReader.reset(); // Pausar leitura até clicar em "Próximo"
+        });
+    }
+
+    function iniciarScanner() {
       codeReader.decodeFromVideoDevice(null, videoElement, (result, err) => {
         if (result) {
-          handleBarcode(result.getText());
+          let codigo = result.text;
+          if (codigo.includes(".")) {
+            codigo = codigo.split(".")[0]; // Pega antes do ponto
+          }
+          enviarCodigo(codigo);
         }
       });
     }
 
-    async function handleBarcode(barcode) {
-      const res = await fetch(`${API_URL}?action=scan&barcode=${barcode}`);
-      const data = await res.json();
-      palletNum.textContent = data.pallet;
-    }
-
-    function resetScanner() {
-      palletNum.textContent = "--";
-    }
+    iniciarScanner();
   </script>
 </body>
 </html>
