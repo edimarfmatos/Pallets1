@@ -1,79 +1,74 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt">
 <head>
   <meta charset="UTF-8">
-  <title>Análise de Fotos</title>
+  <title>Scanner de Código</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; text-align: center; }
-    video { width: 100%; max-width: 400px; border: 3px solid #333; margin: 20px 0; }
-    .info { font-size: 18px; margin: 10px 0; }
-    .destaque { font-size: 24px; font-weight: bold; color: #007BFF; }
-    button { font-size: 18px; padding: 10px 20px; margin: 10px; cursor: pointer; }
+    body {
+      margin: 0; padding: 0;
+      font-family: Arial, sans-serif;
+      background: #111; color: #fff; text-align: center;
+    }
+    h1 { margin: 20px 0; font-size: 1.5em; }
+    video {
+      width: 90%; margin: 10px auto; display: block;
+      border: 5px solid #0f0; border-radius: 15px;
+    }
+    #pallet {
+      font-size: 1.2em; margin-top: 20px; color: #aaa;
+    }
+    #pallet-num {
+      font-size: 3em; font-weight: bold; color: #0f0;
+    }
+    #qtd {
+      font-size: 1.2em; margin-top: 10px; color: #0ff;
+    }
+    button {
+      margin-top: 20px; padding: 10px 20px;
+      border: none; border-radius: 8px;
+      background: #0f0; color: #000; font-size: 1em;
+    }
   </style>
 </head>
 <body>
-  <h1>Análise de Fotos</h1>
-  <video id="video" autoplay></video>
-  <div class="info">NP: <span class="destaque" id="np">-</span></div>
-  <div class="info">Pallet: <span class="destaque" id="pallet">-</span></div>
-  <div class="info">Quantidade total: <span class="destaque" id="quantidade">0</span></div>
-  <button onclick="confirmar()">Confirmar e Próximo</button>
+  <h1>📦 Scanner de Código</h1>
+  <video id="preview"></video>
 
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@latest"></script>
+  <div id="pallet">PALLET</div>
+  <div id="pallet-num">--</div>
+  <div id="qtd">Quantidade: --</div>
+
+  <button onclick="startScanner()">🔄 Reiniciar Scanner</button>
+
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbwSqSk06kJSYQEI-8B51skB7MhM2zYty0SKiK1rjlke7qR7BLkmGjsbScvb2MsaSo-5QA/exec";
-    const video = document.getElementById("video");
-    const npEl = document.getElementById("np");
-    const palletEl = document.getElementById("pallet");
-    const qtdEl = document.getElementById("quantidade");
+    let codeReader;
 
-    let codigoAtual = "";
+    function startScanner() {
+      const video = document.getElementById('preview');
+      const palletEl = document.getElementById('pallet-num');
+      const qtdEl = document.getElementById('qtd');
 
-    // Inicializa a câmera
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(stream => video.srcObject = stream)
-      .catch(err => alert("Erro câmera: " + err));
-
-    // Scanner ZXing
-    const codeReader = new ZXing.BrowserMultiFormatReader();
-    codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
-      if (result && result.text !== codigoAtual) {
-        codigoAtual = result.text;
-        consultarNP(codigoAtual);
+      if (codeReader) {
+        codeReader.reset();
       }
-    });
 
-    function consultarNP(codigo) {
-      fetch(API_URL + "?codigo=" + encodeURIComponent(codigo))
-        .then(r => r.json())
-        .then(data => {
-          npEl.textContent = data.np;
-          palletEl.textContent = data.pallet;
-          qtdEl.textContent = data.quantidade;
-        })
-        .catch(err => console.error(err));
+      codeReader = new ZXing.BrowserMultiFormatReader();
+      codeReader.decodeFromVideoDevice(null, video, (result, err) => {
+        if (result) {
+          const np = result.text;
+          fetch(`https://script.google.com/macros/s/AKfycbxd0XwHqOR-aV0QhHCdj1Y154tqKZuFfA_MsGjY9j1gRrW2i7Wjo7VYeuCEB3uhVJ4Gqg/exec?np=${np}`)
+            .then(res => res.json())
+            .then(data => {
+              palletEl.textContent = data.pallet;
+              qtdEl.textContent = "Quantidade: " + data.qtd;
+            })
+            .catch(() => alert("Erro ao enviar código!"));
+        }
+      });
     }
 
-    function confirmar() {
-      if (!codigoAtual) {
-        alert("Nenhum código detectado!");
-        return;
-      }
-      fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo: codigoAtual, quantidade: 1 })
-      })
-      .then(r => r.json())
-      .then(data => {
-        npEl.textContent = data.np;
-        palletEl.textContent = data.pallet;
-        qtdEl.textContent = data.quantidadeTotal;
-        codigoAtual = "";
-        alert("Registrado com sucesso!");
-      })
-      .catch(err => console.error(err));
-    }
+    window.onload = startScanner;
   </script>
 </body>
 </html>
